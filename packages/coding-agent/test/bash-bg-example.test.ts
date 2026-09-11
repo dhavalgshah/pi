@@ -2,7 +2,12 @@
  * Unit test for the bash-bg example.
  */
 
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+
+process.env.PI_BG_DIR = mkdtempSync(join(tmpdir(), "pi-bg-test-"));
 import { startTask, taskStatus } from "../examples/extensions/bash-bg.ts";
 
 function waitForDone(id: string, tries = 40): Promise<void> {

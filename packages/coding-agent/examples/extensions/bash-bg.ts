@@ -26,14 +26,15 @@ export interface BgTask {
 	exitCode: number | null;
 }
 
-function dir(): string {
-	const d = join(tmpdir(), "pi-bg");
+export function bgDir(): string {
+	// PI_BG_DIR isolates registries (tests, and one day sessions).
+	const d = process.env.PI_BG_DIR ?? join(tmpdir(), "pi-bg");
 	mkdirSync(d, { recursive: true });
 	return d;
 }
 
 function registryPath(): string {
-	return join(dir(), "registry.json");
+	return join(bgDir(), "registry.json");
 }
 
 function load(): BgTask[] {
@@ -45,7 +46,11 @@ function load(): BgTask[] {
 }
 
 function save(tasks: BgTask[]): void {
-	writeFileSync(registryPath(), JSON.stringify(tasks));
+	// Atomic write: readers never see torn JSON from parallel writers.
+	const target = registryPath();
+	const tmp = `${target}.${process.pid}.tmp`;
+	writeFileSync(tmp, JSON.stringify(tasks));
+	renameSync(tmp, target);
 }
 
 export function startTask(command: string): BgTask {
@@ -56,13 +61,13 @@ export function startTask(command: string): BgTask {
 	// Shell injection is by design here (parity with the bash tool itself).
 	const n = tasks.length + 1;
 	const stamp = Date.now().toString(36);
-	const tmpLog = join(dir(), `bg-${n}-${stamp}.tmp.log`);
+	const tmpLog = join(bgDir(), `bg-${n}-${stamp}.tmp.log`);
 	const fd = openSync(tmpLog, "a");
 	const child = spawn(command, { detached: true, shell: true, stdio: ["ignore", fd, fd] });
 	child.unref();
 	const pid = child.pid ?? -1;
 	const id = `bg-${n}-${pid}-${stamp}`;
-	const logPath = join(dir(), `${id}.log`);
+	const logPath = join(bgDir(), `${id}.log`);
 	renameSync(tmpLog, logPath);
 	const task: BgTask = {
 		id,

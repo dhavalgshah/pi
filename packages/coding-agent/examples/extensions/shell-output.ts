@@ -8,7 +8,7 @@
  * wait-exit (until the task exits), each capped by a timeout.
  */
 
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
@@ -53,6 +53,9 @@ export interface TaskRead {
 	timedOut: boolean;
 }
 
+// Single-session assumption: cursors live in memory, so an extension reload
+// restarts them (benign re-delivery) and two sessions sharing the registry
+// last-write-win each other. Stated, not solved.
 const cursors = new Map<string, number>();
 const MAX_CHARS = 8000;
 
@@ -86,9 +89,19 @@ export async function readTaskOutput(
 		}
 	}
 	const final = taskStatus(id);
+	// Symlink guard: a swapped log path reads arbitrary files.
+	if (lstatSync(task.logPath, { throwIfNoEntry: false })?.isSymbolicLink()) {
+		return { id, status: "unknown", exitCode: null, from_offset: from, next_offset: from, output: "refusing: log path is a symlink", timedOut };
+	}
 	const size = existsSync(task.logPath) ? statSync(task.logPath).size : 0;
 	from = Math.min(from, size);
 	const buf = existsSync(task.logPath) ? readFileSync(task.logPath) : Buffer.alloc(0);
+	// Snap mid-line offsets forward to the next newline; the partial line is
+	// discarded, never split. Line-start offsets pass through untouched.
+	if (from > 0 && from < size && buf[from - 1] !== 0x0a) {
+		const nl = buf.indexOf(0x0a, from);
+		from = nl === -1 ? size : nl + 1;
+	}
 	const slice = buf.subarray(from, size);
 	let output = slice.toString("utf8");
 	if (output.length > MAX_CHARS) {
