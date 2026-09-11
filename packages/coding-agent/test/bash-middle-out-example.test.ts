@@ -23,6 +23,10 @@ describe("middleOutView", () => {
 		expect(out).toContain("t100");
 	});
 
+	it("preserves blank lines so numbers do not shift", () => {
+		const out = middleOutView("t1", "h1\n\nh3", 100);
+		expect(out).toContain("h1\n\nh3");
+	});
 	it("strips the core tail footer before composing", () => {
 		const out = middleOutView("a\nb\n[Showing lines 4901-5000 of 5000. Full output: /tmp/x]", "h1", 5000);
 		expect(out.match(/Showing lines/g) ?? []).toHaveLength(0);

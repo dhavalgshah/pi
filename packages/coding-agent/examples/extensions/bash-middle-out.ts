@@ -29,7 +29,9 @@ export function stripTailFooter(tailText: string): string {
 
 export function middleOutView(tailText: string, headText: string, totalLines: number): string {
 	const tail = stripTailFooter(tailText);
-	const headLines = headText.split("\n").filter((l) => l.length > 0);
+	// Raw lines preserved: filtering blanks would shift displayed content
+	// against real line numbers.
+	const headLines = headText.split("\n");
 	const tailCount = tail.split("\n").length;
 	const omitted = Math.max(0, totalLines - headLines.length - tailCount);
 	const head = headLines.slice(0, HEAD_LINES).join("\n");
@@ -53,6 +55,8 @@ export async function readHeadLines(path: string, maxLines: number): Promise<str
 export default function (pi: ExtensionAPI) {
 	pi.on("tool_result", async (event) => {
 		if (event.toolName !== "bash") return undefined;
+		// Pinned to core's bash result details (formatOutput): renames fail
+		// silent to tail-only by the guards below.
 		const details = event.details as
 			| { truncation?: { truncated?: boolean; totalLines?: number }; fullOutputPath?: string }
 			| undefined;
