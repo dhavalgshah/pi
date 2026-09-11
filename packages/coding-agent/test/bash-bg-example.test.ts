@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 process.env.PI_BG_DIR = mkdtempSync(join(tmpdir(), "pi-bg-test-"));
-import { startTask, taskStatus } from "../examples/extensions/bash-bg.ts";
+import defaultExtension, { killTask, startTask, taskStatus } from "../examples/extensions/bash-bg.ts";
 
 function waitForDone(id: string, tries = 40): Promise<void> {
 	return new Promise((resolve, reject) => {
@@ -46,5 +46,31 @@ describe("bash-bg ids", () => {
 		const b = startTask("echo b");
 		expect(a.id).not.toBe(b.id);
 		expect(a.logPath).not.toBe(b.logPath);
+	});
+});
+
+describe("shell_kill", () => {
+	it("kills a running task SIGTERM-first", async () => {
+		const t = startTask("sleep 60");
+		const r = await killTask(t.id);
+		expect(r.result).toBe("killed");
+		expect(r.how).toBe("term");
+		expect(taskStatus(t.id)?.status).toBe("done");
+	});
+	it("reports unknown ids and finished tasks cleanly", async () => {
+		expect((await killTask("bg-0-0-0")).result).toBe("not-found");
+		const t = startTask("echo hi");
+		await waitForDone(t.id);
+		expect((await killTask(t.id)).result).toBe("already-exited");
+	});
+	it("registers working tools (load smoke test)", async () => {
+		const tools: Record<string, { execute: (id: string, params: never) => Promise<unknown> }> = {};
+		defaultExtension({ registerTool: (t: { name: string }) => { tools[t.name] = t as never; } } as never);
+		expect(Object.keys(tools).sort()).toEqual(["bash_bg", "shell_kill"]);
+		const t = startTask("sleep 60");
+	 const out = (await tools.shell_kill.execute("x", { taskId: t.id } as never)) as {
+			content: [{ text: string }];
+		};
+		expect(out.content[0].text).toMatch(/killed .* via SIGTERM/);
 	});
 });
