@@ -44,8 +44,12 @@ export async function fanout(specs: FanoutSpec[]): Promise<FanoutRun[]> {
 		throw new Error(`refusing fan-out of ${specs.length}: max ${MAX_FANOUT} per call`);
 	}
 	const base = mkdtempSync(join(tmpdir(), "pi-fanout-"));
+	const seen = new Map<string, number>();
 	return specs.map((spec) => {
-		const workdir = join(base, spec.label.replace(/[^A-Za-z0-9_-]+/g, "_"));
+		const clean = spec.label.replace(/[^A-Za-z0-9_-]+/g, "_") || "run";
+		const n = (seen.get(clean) ?? 0) + 1;
+		seen.set(clean, n);
+		const workdir = join(base, n > 1 ? `${clean}-${n}` : clean);
 		mkdirSync(workdir, { recursive: true });
 		const outputPath = join(workdir, "output.log");
 		const resultPath = join(workdir, "result.json");

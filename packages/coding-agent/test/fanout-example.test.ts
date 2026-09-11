@@ -41,6 +41,14 @@ describe("fanout example", () => {
 		expect(readFileSync(runs[1].outputPath, "utf8")).toMatch(/hello-b/);
 		expect(runs[0].workdir).not.toBe(runs[1].workdir);
 	});
+	it("dedupes duplicate labels into separate dirs", async () => {
+		const runs = await fanout([
+			{ label: "same", command: "echo one" },
+			{ label: "same", command: "echo two" },
+		]);
+		expect(runs[0].workdir).not.toBe(runs[1].workdir);
+		for (const r of runs) await waitDone(r.taskId);
+	});
 	it("records failure without affecting siblings", async () => {
 		const runs = await fanout([
 			{ label: "ok", command: "echo fine" },
@@ -58,7 +66,9 @@ describe("fanout example", () => {
 		} finally {
 			delete process.env.PI_FANOUT_DEPTH;
 		}
-		await expect(fanout([1, 2, 3, 4, 5].map((i) => ({ label: `r${i}`, command: "echo x" })))).rejects.toThrow(/fan-out/);
+		await expect(
+			fanout([1, 2, 3, 4, 5].map((i) => ({ label: `r${i}`, command: "echo x" }))),
+		).rejects.toThrow(/fan-out/);
 	});
 	it("registers a working tool (load smoke test)", async () => {
 		const { default: fanoutExt } = await import("../examples/extensions/fanout.ts");
