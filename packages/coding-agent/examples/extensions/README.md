@@ -48,6 +48,7 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 | `ssh.ts` | Delegate all tools to a remote machine via SSH using pluggable operations |
 | `subagent/` | Delegate tasks to specialized subagents with isolated context windows |
 | `kill-port.ts` | Frees a TCP port by killing its listener (SIGTERM, then SIGKILL) |
+| `bash-bg.ts` | Run shell commands detached; return a task id immediately (pair with shell-output) |
 
 ### Commands & UI
 
