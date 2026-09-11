@@ -5,14 +5,16 @@
  * registers a `bash_bg` tool that spawns the command detached (stdio to a log
  * file), returns a task id immediately, and lets the agent keep working while
  * the command runs. Pair with `shell-output.ts` to read the log back.
+ *
+ * Usage:
+ *   pi -e ./bash-bg.ts
  */
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
+
+import { existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { Type } from "typebox";
 
 export interface BgTask {
 	id: string;
@@ -24,34 +26,47 @@ export interface BgTask {
 	exitCode: number | null;
 }
 
-export function bgDir(): string {
+function dir(): string {
 	const d = join(tmpdir(), "pi-bg");
 	mkdirSync(d, { recursive: true });
 	return d;
 }
 
-function loadTasks(): BgTask[] {
+function registryPath(): string {
+	return join(dir(), "registry.json");
+}
+
+function load(): BgTask[] {
 	try {
-		return JSON.parse(readFileSync(join(bgDir(), "registry.json"), "utf8")) as BgTask[];
+		return JSON.parse(readFileSync(registryPath(), "utf8")) as BgTask[];
 	} catch {
 		return [];
 	}
 }
 
-function saveTasks(tasks: BgTask[]): void {
-	writeFileSync(join(bgDir(), "registry.json"), JSON.stringify(tasks));
+function save(tasks: BgTask[]): void {
+	writeFileSync(registryPath(), JSON.stringify(tasks));
 }
 
 export function startTask(command: string): BgTask {
-	const tasks = loadTasks();
-	const id = `bg-${tasks.length + 1}`;
-	const logPath = join(bgDir(), `${id}.log`);
-	const fd = openSync(logPath, "a");
+	const tasks = load();
+	// Unique without coordination: counter keeps ids ordered; pid plus
+	// timestamp survive registry deletion and same-millisecond starts.
+	// (Starts are synchronous in one process, so the counter never races.)
+	// Shell injection is by design here (parity with the bash tool itself).
+	const n = tasks.length + 1;
+	const stamp = Date.now().toString(36);
+	const tmpLog = join(dir(), `bg-${n}-${stamp}.tmp.log`);
+	const fd = openSync(tmpLog, "a");
 	const child = spawn(command, { detached: true, shell: true, stdio: ["ignore", fd, fd] });
 	child.unref();
+	const pid = child.pid ?? -1;
+	const id = `bg-${n}-${pid}-${stamp}`;
+	const logPath = join(dir(), `${id}.log`);
+	renameSync(tmpLog, logPath);
 	const task: BgTask = {
 		id,
-		pid: child.pid ?? -1,
+		pid,
 		command,
 		logPath,
 		startedAt: Date.now(),
@@ -59,21 +74,21 @@ export function startTask(command: string): BgTask {
 		exitCode: null,
 	};
 	child.on("exit", (code) => {
-		const all = loadTasks();
+		const all = load();
 		const t = all.find((x) => x.id === id);
 		if (t) {
 			t.status = "done";
 			t.exitCode = code;
-			saveTasks(all);
+			save(all);
 		}
 	});
 	tasks.push(task);
-	saveTasks(tasks);
+	save(tasks);
 	return task;
 }
 
 export function taskStatus(id: string): BgTask | undefined {
-	const t = loadTasks().find((x) => x.id === id);
+	const t = load().find((x) => x.id === id);
 	if (!t) return undefined;
 	if (t.status === "running" && existsSync(t.logPath)) {
 		try {
@@ -83,6 +98,10 @@ export function taskStatus(id: string): BgTask | undefined {
 		}
 	}
 	return t;
+}
+
+export function readTasks(): BgTask[] {
+	return load();
 }
 
 export default function (pi: ExtensionAPI) {
