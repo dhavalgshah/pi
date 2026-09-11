@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import defaultExtension, { benignExitPatch } from "../examples/extensions/bash-benign-exit.ts";
+import defaultExtension, { benignExitPatch, commandName } from "../examples/extensions/bash-benign-exit.ts";
 
 const EXIT_1_TEXT = "(no output)\n\nCommand exited with code 1";
 
@@ -68,5 +68,27 @@ describe("bash-benign-exit extension", () => {
 			isError: true,
 		};
 		expect(await handler(miss)).toBeUndefined();
+	});
+});
+
+describe("bash-benign-exit v2", () => {
+	it("strips wrappers before matching", () => {
+		expect(commandName("sudo grep x")).toBe("grep");
+		expect(commandName("FOO=1 grep x")).toBe("grep");
+		expect(commandName("git grep x")).toBe("grep");
+		expect(commandName("ls /tmp")).toBe("ls");
+	});
+});
+
+describe("bash-benign-exit diff note", () => {
+	it("labels diff exit 1 as differences found", () => {
+		const r = benignExitPatch({
+			toolName: "bash",
+			command: "diff a b",
+			isError: true,
+			text: "(no output)\n\nCommand exited with code 1",
+		});
+		expect(r?.content).toMatch(/differences found/);
+		expect(r?.content).not.toMatch(/no matches/);
 	});
 });
