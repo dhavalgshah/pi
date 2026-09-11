@@ -21,6 +21,10 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 | `permission-gate.ts` | Prompts for confirmation before dangerous bash commands (rm -rf, sudo, etc.) |
 | `project-trust.ts` | Demonstrates the `project_trust` event for user/global and CLI extensions |
 | `protected-paths.ts` | Blocks writes to protected paths (.env, .git/, node_modules/) |
+| `bash-timeout-default.ts` | Applies a 30s default timeout and 600s cap to bash tool calls |
+| `bash-benign-exit.ts` | Marks grep/rg/diff exit 1 as no-matches, not an error |
+| `bash-untrusted-fence.ts` | Frames bash output as untrusted data, never instructions |
+| `bash-middle-out.ts` | Reattaches log head on truncated bash output with exact omitted counts |
 | `confirm-destructive.ts` | Confirms before destructive session actions (clear, switch, fork) |
 | `dirty-repo-guard.ts` | Prevents session changes with uncommitted git changes |
 | `sandbox/` | OS-level sandboxing using `@anthropic-ai/sandbox-runtime` with per-project config |
@@ -43,6 +47,7 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 | `truncated-tool.ts` | Wraps ripgrep with proper output truncation (50KB/2000 lines) |
 | `ssh.ts` | Delegate all tools to a remote machine via SSH using pluggable operations |
 | `subagent/` | Delegate tasks to specialized subagents with isolated context windows |
+| `kill-port.ts` | Frees a TCP port by killing its listener (SIGTERM, then SIGKILL) |
 | `bash-bg.ts` | Run shell commands detached; return a task id immediately (pair with shell-output) |
 
 ### Commands & UI
