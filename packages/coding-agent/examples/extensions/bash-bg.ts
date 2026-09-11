@@ -11,10 +11,12 @@
  */
 
 import { spawn } from "node:child_process";
-
 import { existsSync, mkdirSync, openSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+import { killPid } from "./kill-port.ts";
 
 export interface BgTask {
 	id: string;
@@ -130,4 +132,53 @@ export default function (pi: ExtensionAPI) {
 			};
 		},
 	});
+	pi.registerTool({
+		name: "shell_kill",
+		label: "shell_kill",
+		description:
+			"Terminate a bash_bg task by id (SIGTERM-first with a 5s poll before SIGKILL). Never signals finished tasks.",
+		parameters: Type.Object({
+			taskId: Type.String({ description: "Task id from bash_bg" }),
+		}),
+		async execute(_toolCallId, params) {
+			const r = await killTask(params.taskId);
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text:
+							r.result === "killed"
+								? `killed ${r.id} (pid ${r.pid}) via SIG${r.how === "term" ? "TERM" : "KILL"}`
+								: r.result === "already-exited"
+									? `${r.id} already exited; nothing signaled`
+									: `unknown task ${r.id}`,
+					},
+				],
+			};
+		},
+	});
+}
+
+export interface KillResult {
+	id: string;
+	pid: number | null;
+	result: "killed" | "already-exited" | "not-found";
+	how: "term" | "kill" | null;
+}
+
+export async function killTask(id: string): Promise<KillResult> {
+	const task = taskStatus(id);
+	if (!task) return { id, pid: null, result: "not-found", how: null };
+	// Never signal a finished task: the pid may already belong to someone else.
+	if (task.status === "done") return { id, pid: task.pid, result: "already-exited", how: null };
+	try {
+		const how = await killPid(task.pid);
+		return { id, pid: task.pid, result: "killed", how };
+	} catch (err) {
+		// ESRCH race: the pid died between lookup and signal.
+		if ((err as NodeJS.ErrnoException).code === "ESRCH") {
+			return { id, pid: task.pid, result: "already-exited", how: null };
+		}
+		throw err;
+	}
 }
