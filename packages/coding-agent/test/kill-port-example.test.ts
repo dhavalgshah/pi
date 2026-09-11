@@ -5,7 +5,7 @@
 import { spawn } from "node:child_process";
 import { createConnection, createServer } from "node:net";
 import { describe, expect, it } from "vitest";
-import { findPidByPort, killByPort } from "../examples/extensions/kill-port.ts";
+import { assertKillable, findPidByPort, killByPort, parseLsof, parseSs } from "../examples/extensions/kill-port.ts";
 
 function freePort(): Promise<number> {
 	return new Promise((resolve) => {
@@ -54,5 +54,25 @@ describe("killByPort", () => {
 	it("rejects invalid ports and empty ports", async () => {
 		await expect(killByPort(0)).rejects.toThrow(/invalid port/);
 		await expect(killByPort(54321)).rejects.toThrow(/no listener/);
+	});
+});
+
+describe("kill-port guards", () => {
+	it("parses all lsof pids", () => {
+		expect(parseLsof("123\n456\n")).toEqual([123, 456]);
+		expect(parseLsof("")).toEqual([]);
+	});
+	it("parses all ss pids without cross-port matches", () => {
+		const ss = "LISTEN 0 10 0.0.0.0:8080 users:(pid=11) \nLISTEN 0 10 0.0.0.0:808  users:(pid=22)";
+		expect(parseSs(ss, 8080)).toEqual([11]);
+		expect(parseSs(ss, 808)).toEqual([22]);
+	});
+	it("refuses system ports and tiny pids", () => {
+		expect(() => assertKillable(22, 9999)).toThrow(/system port/);
+		expect(() => assertKillable(8080, 1)).toThrow(/refusing pid/);
+		assertKillable(8080, 9999);
+	});
+	it("killByPort refuses system ports before lookup", async () => {
+		await expect(killByPort(22)).rejects.toThrow(/system port/);
 	});
 });
