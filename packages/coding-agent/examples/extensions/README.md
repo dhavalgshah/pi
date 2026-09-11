@@ -49,6 +49,7 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 | `subagent/` | Delegate tasks to specialized subagents with isolated context windows |
 | `kill-port.ts` | Frees a TCP port by killing its listener (SIGTERM, then SIGKILL) |
 | `bash-bg.ts` | Run shell commands detached; return a task id immediately (pair with shell-output) |
+| `shell-output.ts` | Cursor reads over bash-bg task logs: from_offset plus return-now/wait-write/wait-exit modes |
 
 ### Commands & UI
 
