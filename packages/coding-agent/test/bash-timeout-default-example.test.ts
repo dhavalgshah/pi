@@ -5,7 +5,10 @@
 import { describe, expect, it, vi } from "vitest";
 import defaultExtension, {
 	BASH_DEFAULT_TIMEOUT,
+	BASH_MAX_TIMEOUT,
 	resolveBashTimeout,
+	SHELL_TIMEOUT_TOOLS,
+	timeoutNote,
 } from "../examples/extensions/bash-timeout-default.ts";
 
 describe("resolveBashTimeout", () => {
@@ -47,5 +50,22 @@ describe("bash-timeout-default extension", () => {
 		const otherEvent = { toolName: "read", input: { path: "a.ts" } };
 		await handler(otherEvent);
 		expect(otherEvent.input).toEqual({ path: "a.ts" });
+	});
+});
+
+describe("bash-timeout-default v2", () => {
+	it("default stays below max", () => {
+		expect(BASH_DEFAULT_TIMEOUT).toBeLessThan(BASH_MAX_TIMEOUT);
+	});
+	it("covers powershell too", () => {
+		expect(SHELL_TIMEOUT_TOOLS).toContain("bash");
+		expect(SHELL_TIMEOUT_TOOLS).toContain("powershell");
+	});
+	it("coaches on core timeout text, once", () => {
+		const once = timeoutNote("Command timed out after 30 seconds") as string;
+		expect(once).toMatch(/larger timeout/);
+		expect(once).toMatch(/bash_bg/);
+		expect(timeoutNote("hello")).toBeUndefined();
+		expect(timeoutNote(once)).toBeUndefined();
 	});
 });
