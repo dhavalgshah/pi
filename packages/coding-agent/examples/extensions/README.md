@@ -21,6 +21,7 @@ cp permission-gate.ts ~/.pi/agent/extensions/
 | `permission-gate.ts` | Prompts for confirmation before dangerous bash commands (rm -rf, sudo, etc.) |
 | `project-trust.ts` | Demonstrates the `project_trust` event for user/global and CLI extensions |
 | `protected-paths.ts` | Blocks writes to protected paths (.env, .git/, node_modules/) |
+| `bash-timeout-default.ts` | Applies a 30s default timeout and 600s cap to bash tool calls |
 | `bash-benign-exit.ts` | Marks grep/rg/diff exit 1 as no-matches, not an error |
 | `confirm-destructive.ts` | Confirms before destructive session actions (clear, switch, fork) |
 | `dirty-repo-guard.ts` | Prevents session changes with uncommitted git changes |
